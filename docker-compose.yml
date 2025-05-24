@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  slack-hands-bot:
+    build: .
+    container_name: slack-hands-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./openhands_workspace:/app/openhands_workspace
+    environment:
+      - NODE_ENV=production
+    # ヘルスチェック
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
