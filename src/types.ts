@@ -1,0 +1,26 @@
+export type Config = {
+  repository: string;
+  model: string;
+  provider: string;
+  openhandsWorkspace: string;
+  maxIterations: number;
+  environment: Record<string, string>;
+};
+
+export type SlackMessage = {
+  channel: string;
+  ts: string;
+  user: string;
+  text: string;
+};
+
+export type ButtonAction = {
+  type: "button";
+  action_id: string;
+  block_id: string;
+  text: {
+    type: "plain_text";
+    text: string;
+  };
+  value: string;
+};
