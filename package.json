@@ -1,21 +1,34 @@
 {
   "name": "slack-hands",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Slack Bot for OpenHands CLI integration",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsx src/index.ts",
-    "start": "node dist/index.js"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "check-config": "tsx scripts/check-config.ts",
+    "setup": "cp .env.example .env && cp config.example.json config.json"
   },
-  "keywords": [],
+  "keywords": [
+    "slack",
+    "bot",
+    "openhands",
+    "cli",
+    "coding"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@8.15.3+sha1.64838798f519c18029c1e8a1310e16101fc2eda0",
   "dependencies": {
     "@slack/bolt": "^4.4.0",
+    "@slack/types": "^2.14.0",
+    "@slack/web-api": "^7.9.2",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
     "@types/node": "^22.15.21",
-    "child_process": "^1.0.2",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
