@@ -1,8 +1,8 @@
 # Use Node.js 20 LTS as base image
 FROM node:24-alpine
 
-# Install Python and pip for OpenHands
-RUN apk add --no-cache python3 py3-pip git
+# Install Docker CLI for OpenHands integration
+RUN apk add --no-cache docker-cli git
 
 # Enable pnpm
 RUN corepack enable
@@ -15,9 +15,6 @@ COPY package.json pnpm-lock.yaml ./
 
 # Install Node.js dependencies
 RUN pnpm install --frozen-lockfile
-
-# Install OpenHands
-RUN pip3 install openhands
 
 # Copy source code
 COPY . .

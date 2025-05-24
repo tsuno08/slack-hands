@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/example/demo-repo.git",
-  "model": "gpt-4",
+  "model": "openai/gpt-4",
   "provider": "openai",
   "openhandsWorkspace": "./openhands_workspace",
   "maxIterations": 30,
