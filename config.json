@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/example/demo-repo.git",
+  "model": "gpt-4",
+  "provider": "openai",
+  "openhandsWorkspace": "./openhands_workspace",
+  "maxIterations": 30,
+  "environment": {
+    "NODE_ENV": "development",
+    "DEBUG": "true"
+  }
+}
