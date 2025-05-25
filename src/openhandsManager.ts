@@ -34,22 +34,10 @@ export class OpenHandsManager extends EventEmitter {
         this.config.openhandsWorkspace
       }:/workspace:rw`;
 
-      // プロバイダーに応じたAPIキーを選択
-      let apiKey = "";
-      if (
-        this.config.provider === "openai" ||
-        this.config.model.includes("openai")
-      ) {
-        apiKey = process.env.OPENAI_API_KEY || "";
-      } else if (
-        this.config.provider === "anthropic" ||
-        this.config.model.includes("anthropic")
-      ) {
-        apiKey = process.env.ANTHROPIC_API_KEY || "";
-      } else {
-        // その他のプロバイダーの場合、環境変数から推測
-        apiKey =
-          process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || "";
+      const apiKey = process.env.LLM_API_KEY;
+      if (!apiKey) {
+        reject(new Error("LLM_API_KEY is not set"));
+        return;
       }
 
       const args = [
