@@ -1,13 +1,16 @@
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import { Config } from "./types";
 import { logger } from "./logger";
 
 export class CodexManager extends EventEmitter {
   private processes: Map<string, ChildProcess> = new Map();
+  private config: Config;
   private outputBuffer: Map<string, string> = new Map();
 
-  constructor() {
+  constructor(config: Config) {
     super();
+    this.config = config;
   }
 
   public startCodex = (
@@ -32,22 +35,10 @@ export class CodexManager extends EventEmitter {
         return;
       }
 
-      const args = [
-        "--provider",
-        process.env.PROVIDER || "openai",
-        "--model",
-        process.env.MODEL || "",
-        "--approval-mode",
-        "full-auto",
-        message,
-      ];
-
-      logger.debug("Codex Docker command args:", args);
-
-      const codexProcess = spawn("codex", args, {
-        stdio: ["pipe", "pipe", "pipe"],
+      const codexProcess = spawn("codex", {
         env: {
           ...process.env,
+          ...this.config.environment,
         },
       });
 
