@@ -42,10 +42,9 @@ export class CodexManager extends EventEmitter {
         message,
       ];
 
-      logger.debug("Codex Docker command args:", args);
+      logger.debug("Codex command args:", args);
 
       const codexProcess = spawn("codex", args, {
-        stdio: ["pipe", "pipe", "pipe"],
         env: {
           ...process.env,
         },
