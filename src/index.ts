@@ -247,7 +247,6 @@ const startApp = async (): Promise<void> => {
     logger.info("⚡️ Slack Hands Bot is running!");
     logger.info(`📁 Repository: ${config.repository}`);
     logger.info(`🤖 Model: ${config.model} (${config.provider})`);
-    logger.info(`📂 Workspace: ${config.workspace}`);
   } catch (error) {
     logger.error("Failed to start the app:", error);
     process.exit(1);

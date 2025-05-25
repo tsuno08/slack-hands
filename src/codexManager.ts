@@ -35,28 +35,7 @@ export class CodexManager extends EventEmitter {
         return;
       }
 
-      const args = [
-        "run",
-        "-i",
-        "--rm",
-        "--pull=always",
-        "-e",
-        `OPENAI_API_KEY=${apiKey}`,
-        "-e",
-        `MODEL=${this.config.model}`,
-        "-v",
-        `${process.cwd()}/${this.config.workspace}:/workspace:rw`,
-        "--name",
-        `codex-${processKey.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}`,
-        "ghcr.io/openai/codex:latest",
-        "codex",
-        message,
-      ];
-
-      logger.debug("Codex Docker command args:", args);
-
-      const codexProcess = spawn("docker", args, {
-        stdio: ["pipe", "pipe", "pipe"],
+      const codexProcess = spawn("codex", {
         env: {
           ...process.env,
           ...this.config.environment,

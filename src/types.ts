@@ -2,8 +2,6 @@ export type Config = {
   repository: string;
   model: string;
   provider: string;
-  workspace: string;
-  maxIterations: number;
   environment: Record<string, string>;
 };
 
