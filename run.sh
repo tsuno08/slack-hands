@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Slack Hands Bot Docker Run Script
+# Slack Codex Bot Docker Run Script
 
 # 色付きのログ出力用関数
 log_info() {
@@ -42,7 +42,7 @@ check_env() {
 # Dockerイメージをビルド
 build_image() {
     log_info "Dockerイメージをビルドしています..."
-    docker build -t slack-hands-bot .
+    docker build -t slack-codex-bot .
     if [ $? -eq 0 ]; then
         log_info "Dockerイメージのビルドが完了しました"
     else
@@ -53,24 +53,24 @@ build_image() {
 
 # コンテナを実行
 run_container() {
-    log_info "Slack Hands Botを起動しています..."
+    log_info "Slack Codex Botを起動しています..."
     
     # 既存のコンテナを停止・削除
-    docker stop slack-hands-bot 2>/dev/null || true
-    docker rm slack-hands-bot 2>/dev/null || true
+    docker stop slack-codex-bot 2>/dev/null || true
+    docker rm slack-codex-bot 2>/dev/null || true
     
     # 新しいコンテナを起動
     docker run -d \
-        --name slack-hands-bot \
+        --name slack-codex-bot \
         --env-file .env \
         -v "$(pwd)/config.json:/app/config.json:ro" \
         --restart unless-stopped \
-        slack-hands-bot
+        slack-codex-bot
     
     if [ $? -eq 0 ]; then
-        log_info "✅ Slack Hands Botが正常に起動しました"
-        log_info "ログを確認: docker logs -f slack-hands-bot"
-        log_info "停止する場合: docker stop slack-hands-bot"
+        log_info "✅ Slack Codex Botが正常に起動しました"
+        log_info "ログを確認: docker logs -f slack-codex-bot"
+        log_info "停止する場合: docker stop slack-codex-bot"
     else
         log_error "❌ コンテナの起動に失敗しました"
         exit 1
@@ -80,12 +80,12 @@ run_container() {
 # ログ表示
 show_logs() {
     log_info "コンテナのログを表示しています..."
-    docker logs -f slack-hands-bot
+    docker logs -f slack-codex-bot
 }
 
 # ヘルプ表示
 show_help() {
-    echo "Slack Hands Bot Docker Runner"
+    echo "Slack Codex Bot Docker Runner"
     echo ""
     echo "使用方法:"
     echo "  ./run.sh [command]"
@@ -117,19 +117,19 @@ case "${1:-start}" in
         show_logs
         ;;
     "stop")
-        log_info "Slack Hands Botを停止しています..."
-        docker stop slack-hands-bot
-        docker rm slack-hands-bot
-        log_info "✅ Slack Hands Botが停止されました"
+        log_info "Slack Codex Botを停止しています..."
+        docker stop slack-codex-bot
+        docker rm slack-codex-bot
+        log_info "✅ Slack Codex Botが停止されました"
         ;;
     "restart")
-        log_info "Slack Hands Botを再起動しています..."
-        docker restart slack-hands-bot
-        log_info "✅ Slack Hands Botが再起動されました"
+        log_info "Slack Codex Botを再起動しています..."
+        docker restart slack-codex-bot
+        log_info "✅ Slack Codex Botが再起動されました"
         ;;
     "status")
         log_info "コンテナの状態:"
-        docker ps -a --filter name=slack-hands-bot
+        docker ps -a --filter name=slack-codex-bot
         ;;
     "help")
         show_help

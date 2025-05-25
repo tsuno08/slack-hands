@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  slack-hands-bot:
+  slack-codex-bot:
     build: .
-    container_name: slack-hands-bot
+    container_name: slack-codex-bot
     restart: unless-stopped
     env_file:
       - .env

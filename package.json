@@ -1,5 +1,5 @@
 {
-  "name": "slack-hands",
+  "name": "slack-codex",
   "version": "1.0.0",
   "description": "Slack Bot for Codex CLI integration",
   "main": "dist/index.js",

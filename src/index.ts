@@ -66,10 +66,10 @@ app.event("app_mention", async ({ event, client }) => {
       logger.info("Help command requested", { channel, user });
       await client.chat.postMessage({
         channel: channel,
-        text: `🤖 *Slack Hands Bot* へようこそ！
+        text: `🤖 *Slack Codex Bot* へようこそ！
 
 使用方法:
-\`@${app.client.token ? "bot" : "slack-hands"} [タスクの説明]\`
+\`@${app.client.token ? "bot" : "slack-codex"} [タスクの説明]\`
 
 例:
 • \`@bot ウェブサイトにログイン機能を追加して\`
@@ -260,7 +260,7 @@ app.action("stop_codex", async ({ ack, body, client }) => {
 const startApp = async (): Promise<void> => {
   try {
     await app.start();
-    logger.info("⚡️ Slack Hands Bot is running!");
+    logger.info("⚡️ Slack Codex Bot is running!");
     logger.info(`📁 Repository: ${process.env.REPOSITORY}`);
     logger.info(
       `🤖 Model: ${process.env.OPENROUTER_MODEL || "openai/gpt-4"} (${
