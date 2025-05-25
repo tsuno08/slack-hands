@@ -1,5 +1,0 @@
-{
-  "repository": "https://github.com/example/demo-repo.git",
-  "model": "openai/gpt-4",
-  "provider": "openai"
-}
