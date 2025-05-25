@@ -13,6 +13,7 @@ try {
   console.log(`   Repository: ${config.repository}`);
   console.log(`   Model: ${config.model}`);
   console.log(`   Provider: ${config.provider}`);
+  console.log(`   Max Iterations: ${config.maxIterations}`);
 } catch (error) {
   console.error(
     "❌ Configuration error:",

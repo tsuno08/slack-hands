@@ -1,5 +1,11 @@
 {
   "repository": "https://github.com/example/demo-repo.git",
   "model": "openai/gpt-4",
-  "provider": "openai"
+  "provider": "openai",
+  "workspace": "./workspace",
+  "maxIterations": 30,
+  "environment": {
+    "NODE_ENV": "development",
+    "DEBUG": "true"
+  }
 }
