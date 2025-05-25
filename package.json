@@ -1,7 +1,7 @@
 {
   "name": "slack-hands",
   "version": "1.0.0",
-  "description": "Slack Bot for codex CLI integration",
+  "description": "Slack Bot for OpenHands CLI integration",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -14,6 +14,7 @@
   "keywords": [
     "slack",
     "bot",
+    "openhands",
     "cli",
     "coding"
   ],
