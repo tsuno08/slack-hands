@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 import * as pty from "node-pty";
+import stripAnsi from "strip-ansi";
 import { Config } from "./types";
 import { logger } from "./logger";
 
@@ -104,10 +105,13 @@ export class OpenHandsManager extends EventEmitter {
       ptyProcess.onData((data: string) => {
         logger.debug(`OpenHands output [${processKey}]:`, data.trim());
 
+        // ANSIエスケープシーケンスを除去
+        const cleanData = stripAnsi(data);
+
         const processData = this.processes.get(processKey);
         if (processData) {
-          // "Initializing..." の検出
-          if (data.includes("Initializing...")) {
+          // "Initializing..." の検出（クリーンなデータで判定）
+          if (cleanData.includes("Initializing...")) {
             logger.info(`Loading started for [${processKey}]`);
             processData.isLoading = true;
             processData.awaitingNextOutput = true;
@@ -117,7 +121,7 @@ export class OpenHandsManager extends EventEmitter {
           else if (
             processData.isLoading &&
             processData.awaitingNextOutput &&
-            data.trim() !== ""
+            cleanData.trim() !== ""
           ) {
             logger.info(`Loading ended for [${processKey}]`);
             processData.isLoading = false;
@@ -126,7 +130,8 @@ export class OpenHandsManager extends EventEmitter {
           }
         }
 
-        this.emit("output", { channel, ts, output: data });
+        // クリーンなデータを出力として送信
+        this.emit("output", { channel, ts, output: cleanData });
       });
 
       ptyProcess.onExit((exitCode) => {
