@@ -114,9 +114,11 @@ openhandsManager.on("output", async ({ channel, ts, output }) => {
     const isRunning = openhandsManager.isProcessRunning(processKey);
 
     // インタラクティブな選択肢をチェック
-    const interactiveChoices = detectInteractiveChoices(output);
+    const interactiveResult = detectInteractiveChoices(output);
+    const { choices: interactiveChoices, filteredOutput } = interactiveResult;
     console.log("=== Interactive Choice Detection Result ===");
     console.log("Raw output:", output);
+    console.log("Filtered output:", filteredOutput);
     console.log("Detected choices:", interactiveChoices);
     console.log("Choices length:", interactiveChoices.length);
 
@@ -129,7 +131,7 @@ openhandsManager.on("output", async ({ channel, ts, output }) => {
 
       try {
         const blocks = createInteractiveChoiceBlock(
-          SlackUtils.truncateOutput(newOutput),
+          SlackUtils.truncateOutput(filteredOutput), // フィルタされた出力を使用
           interactiveChoices
         );
         console.log("Generated blocks:", blocks);
@@ -342,7 +344,8 @@ app.action(/^interactive_choice_/, async ({ ack, body, client }) => {
       // 現在選択されている選択肢のインデックスを取得
       // 出力バッファから現在の選択状況を再解析
       const currentOutput = outputBuffer.get(processKey) || "";
-      const currentChoices = detectInteractiveChoices(currentOutput);
+      const currentResult = detectInteractiveChoices(currentOutput);
+      const currentChoices = currentResult.choices;
       const currentSelectedChoice = currentChoices.find(
         (choice) => choice.isSelected
       );

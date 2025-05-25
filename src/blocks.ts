@@ -164,7 +164,7 @@ export const detectApprovalNeeded = (output: string): boolean => {
 
 export const detectInteractiveChoices = (
   output: string
-): InteractiveChoice[] => {
+): { choices: InteractiveChoice[]; filteredOutput: string } => {
   const lines = output.split("\n");
   const choices: InteractiveChoice[] = [];
 
@@ -173,6 +173,7 @@ export const detectInteractiveChoices = (
 
   let foundQuestion = false;
   let choiceIndex = 0;
+  let questionLineIndex = -1;
 
   console.log("=== Detecting interactive choices ===");
   console.log("Output:", output);
@@ -182,6 +183,7 @@ export const detectInteractiveChoices = (
 
     if (questionPattern.test(line)) {
       foundQuestion = true;
+      questionLineIndex = i;
       console.log("Found question at line", i);
       continue;
     }
@@ -229,8 +231,15 @@ export const detectInteractiveChoices = (
     }
   }
 
+  // questionPatternが見つかった場合、その行以降のみを含むフィルタされた出力を作成
+  const filteredOutput =
+    foundQuestion && questionLineIndex >= 0
+      ? lines.slice(questionLineIndex).join("\n")
+      : output;
+
   console.log("Final detected choices:", choices);
-  return choices;
+  console.log("Filtered output:", filteredOutput);
+  return { choices, filteredOutput };
 };
 
 export const createInteractiveChoiceBlock = (
