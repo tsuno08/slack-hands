@@ -2,8 +2,8 @@ import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 import * as pty from "node-pty";
 import stripAnsi from "strip-ansi";
-import { Config } from "./types";
-import { logger } from "./logger";
+import { Config, ProcessKey, OpenHandsEvent } from "../../shared/types";
+import { logger } from "../../infrastructure/logger";
 
 type PtyProcess = {
   pty: pty.IPty;

@@ -2,11 +2,11 @@
   "name": "slack-hands",
   "version": "1.0.0",
   "description": "Slack Bot for OpenHands CLI integration",
-  "main": "dist/index.js",
+  "main": "dist/main.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/main.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/main.js",
     "clean": "rm -rf dist",
     "check-config": "tsx scripts/check-config.ts",
     "setup": "cp .env.example .env && cp config.example.json config.json"

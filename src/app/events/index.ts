@@ -1,0 +1,1 @@
+export { registerMentionEvent } from "./mention";

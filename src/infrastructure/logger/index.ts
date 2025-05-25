@@ -1,62 +1,70 @@
-export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-}
+export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
+
+export type LogLevelValue = {
+  DEBUG: 0;
+  INFO: 1;
+  WARN: 2;
+  ERROR: 3;
+};
+
+export const LOG_LEVELS: LogLevelValue = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+} as const;
 
 export class Logger {
-  private level: LogLevel;
+  private level: number;
 
-  constructor(level: LogLevel = LogLevel.INFO) {
-    this.level = level;
+  constructor(level: LogLevel = "INFO") {
+    this.level = LOG_LEVELS[level];
   }
 
   private log = (level: LogLevel, message: string, ...args: any[]): void => {
-    if (level < this.level) return;
+    if (LOG_LEVELS[level] < this.level) return;
 
     const timestamp = new Date().toISOString();
-    const levelName = LogLevel[level];
-    const prefix = `[${timestamp}] ${levelName}:`;
+    const prefix = `[${timestamp}] ${level}:`;
 
     switch (level) {
-      case LogLevel.DEBUG:
+      case "DEBUG":
         console.debug(prefix, message, ...args);
         break;
-      case LogLevel.INFO:
+      case "INFO":
         console.info(prefix, message, ...args);
         break;
-      case LogLevel.WARN:
+      case "WARN":
         console.warn(prefix, message, ...args);
         break;
-      case LogLevel.ERROR:
+      case "ERROR":
         console.error(prefix, message, ...args);
         break;
     }
   };
 
   debug = (message: string, ...args: any[]): void => {
-    this.log(LogLevel.DEBUG, message, ...args);
+    this.log("DEBUG", message, ...args);
   };
 
   info = (message: string, ...args: any[]): void => {
-    this.log(LogLevel.INFO, message, ...args);
+    this.log("INFO", message, ...args);
   };
 
   warn = (message: string, ...args: any[]): void => {
-    this.log(LogLevel.WARN, message, ...args);
+    this.log("WARN", message, ...args);
   };
 
   error = (message: string, ...args: any[]): void => {
-    this.log(LogLevel.ERROR, message, ...args);
+    this.log("ERROR", message, ...args);
   };
 
   setLevel = (level: LogLevel): void => {
-    this.level = level;
+    this.level = LOG_LEVELS[level];
   };
 }
 
 // デフォルトロガーインスタンス
 export const logger = new Logger(
-  process.env.NODE_ENV === "development" ? LogLevel.DEBUG : LogLevel.INFO
+  process.env.NODE_ENV === "development" ? "DEBUG" : "INFO"
 );

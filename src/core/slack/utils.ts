@@ -1,5 +1,4 @@
 import { WebClient } from "@slack/web-api";
-import { App } from "@slack/bolt";
 
 export class SlackUtils {
   static formatCodeBlock = (content: string, language: string = ""): string => {
