@@ -110,8 +110,4 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# OpenHands specific
-.openhands/
-openhands_workspace/
-
 config.json

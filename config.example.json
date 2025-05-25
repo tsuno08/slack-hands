@@ -2,7 +2,7 @@
   "repository": "https://github.com/example/demo-repo.git",
   "model": "openai/gpt-4",
   "provider": "openai",
-  "openhandsWorkspace": "./openhands_workspace",
+  "workspace": "./workspace",
   "maxIterations": 30,
   "environment": {
     "NODE_ENV": "development",

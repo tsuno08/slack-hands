@@ -1,7 +1,7 @@
 # Use Node.js 20 LTS as base image
 FROM node:24-alpine
 
-# Install Docker CLI for OpenHands integration
+# Install Docker CLI
 RUN apk add --no-cache docker-cli git
 
 # Enable pnpm
@@ -16,14 +16,13 @@ COPY package.json pnpm-lock.yaml ./
 # Install Node.js dependencies
 RUN pnpm install --frozen-lockfile
 
+RUN pnpm install -g @openai/codex
+
 # Copy source code
 COPY . .
 
 # Build the application
 RUN pnpm run build
-
-# Create openhands workspace directory
-RUN mkdir -p ./openhands_workspace
 
 # Expose port (optional, for health checks)
 EXPOSE 3000

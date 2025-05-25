@@ -64,7 +64,6 @@ run_container() {
         --name slack-hands-bot \
         --env-file .env \
         -v "$(pwd)/config.json:/app/config.json:ro" \
-        -v "$(pwd)/openhands_workspace:/app/openhands_workspace" \
         --restart unless-stopped \
         slack-hands-bot
     

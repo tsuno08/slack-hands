@@ -1,15 +1,13 @@
 import { App } from "@slack/bolt";
 import dotenv from "dotenv";
 import { loadConfig, validateConfig } from "./config";
-import { OpenHandsManager } from "./openhandsManager";
+import { CodexManager } from "./codexManager";
 import { SlackUtils } from "./utils";
 import { logger } from "./logger";
 import {
   createLoadingBlock,
   createOutputBlock,
-  createApprovalBlock,
   createCompletedBlock,
-  detectApprovalNeeded,
 } from "./blocks";
 
 // 環境変数を読み込み
@@ -33,8 +31,8 @@ const app = new App({
   socketMode: true,
 });
 
-// OpenHands マネージャーを初期化
-const openhandsManager = new OpenHandsManager(config);
+// Codex マネージャーを初期化
+const codexManager = new CodexManager(config);
 
 // 出力を蓄積するためのマップ
 const outputBuffer = new Map<string, string>();
@@ -66,7 +64,6 @@ app.event("app_mention", async ({ event, client }) => {
 
 機能:
 • 🔄 リアルタイム出力表示
-• ✅ 承認フロー
 • ⏹️ プロセス停止
 • 📁 Git リポジトリ連携
 
@@ -93,6 +90,7 @@ app.event("app_mention", async ({ event, client }) => {
     // 初期のローディングメッセージを送信
     const response = await client.chat.postMessage({
       channel: channel,
+      text: "🔄 Codexを起動しています...",
       blocks: createLoadingBlock(),
       thread_ts: ts,
     });
@@ -101,72 +99,58 @@ app.event("app_mention", async ({ event, client }) => {
       throw new Error("Failed to post initial message");
     }
 
-    const processKey = openhandsManager.getProcessKey(channel, response.ts);
+    const processKey = codexManager.getProcessKey(channel, response.ts);
     outputBuffer.set(processKey, "");
 
     try {
-      // OpenHandsプロセスを開始
-      await openhandsManager.startOpenHands(task, channel, response.ts);
+      // Codexプロセスを開始
+      await codexManager.startCodex(task, channel, response.ts);
     } catch (error) {
-      logger.error("Failed to start OpenHands process", error);
-      await client.chat.update({
+      logger.error("Failed to start Codex process", error);
+      await client.chat.postMessage({
         channel: channel,
-        ts: response.ts,
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `❌ OpenHandsの起動に失敗しました: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            },
-          },
-        ],
+        text: "❌ Codexプロセスの起動に失敗しました。",
+        thread_ts: response.ts,
       });
+      return;
     }
   } catch (error) {
-    logger.error("Error handling app_mention:", error);
+    logger.error("Error in app_mention handler:", error);
+    await client.chat.postMessage({
+      channel: event.channel,
+      text: "❌ エラーが発生しました。",
+      thread_ts: event.ts,
+    });
   }
 });
 
-// OpenHandsからの出力を処理
-openhandsManager.on("output", async ({ channel, ts, output }) => {
+// Codexからの出力を処理
+codexManager.on("output", async ({ channel, ts, output }) => {
   try {
-    const processKey = openhandsManager.getProcessKey(channel, ts);
+    const processKey = codexManager.getProcessKey(channel, ts);
     const currentOutput = outputBuffer.get(processKey) || "";
     const newOutput = currentOutput + output;
     outputBuffer.set(processKey, newOutput);
 
-    const isRunning = openhandsManager.isProcessRunning(processKey);
+    const isRunning = codexManager.isProcessRunning(processKey);
 
-    // 承認が必要かチェック
-    if (detectApprovalNeeded(output)) {
-      logger.info("Approval required detected", { processKey });
-      await app.client.chat.update({
-        channel: channel,
-        ts: ts,
-        blocks: createApprovalBlock(SlackUtils.truncateOutput(newOutput)),
-      });
-    } else {
-      await app.client.chat.update({
-        channel: channel,
-        ts: ts,
-        blocks: createOutputBlock(
-          SlackUtils.truncateOutput(newOutput),
-          isRunning
-        ),
-      });
-    }
+    await app.client.chat.update({
+      channel: channel,
+      ts: ts,
+      blocks: createOutputBlock(
+        SlackUtils.truncateOutput(newOutput),
+        isRunning
+      ),
+    });
   } catch (error) {
     logger.error("Error updating message with output:", error);
   }
 });
 
-// OpenHandsプロセスが終了したときの処理
-openhandsManager.on("close", async ({ channel, ts, code }) => {
+// Codexプロセスが終了したときの処理
+codexManager.on("close", async ({ channel, ts, code }) => {
   try {
-    const processKey = openhandsManager.getProcessKey(channel, ts);
+    const processKey = codexManager.getProcessKey(channel, ts);
     const finalOutput = outputBuffer.get(processKey) || "";
 
     await app.client.chat.update({
@@ -177,14 +161,14 @@ openhandsManager.on("close", async ({ channel, ts, code }) => {
 
     outputBuffer.delete(processKey);
   } catch (error) {
-    console.error("Error handling process close:", error);
+    logger.error("Error handling process close:", error);
   }
 });
 
 // エラー処理
-openhandsManager.on("error", async ({ channel, ts, error }) => {
+codexManager.on("error", async ({ channel, ts, error }) => {
   try {
-    const processKey = openhandsManager.getProcessKey(channel, ts);
+    const processKey = codexManager.getProcessKey(channel, ts);
     const currentOutput = outputBuffer.get(processKey) || "";
     const errorOutput = currentOutput + `\nError: ${error}`;
 
@@ -209,21 +193,21 @@ openhandsManager.on("error", async ({ channel, ts, error }) => {
       ],
     });
   } catch (updateError) {
-    console.error("Error updating message with error:", updateError);
+    logger.error("Error updating message with error:", updateError);
   }
 });
 
 // Stopボタンのアクション
-app.action("stop_openhands", async ({ ack, body, client }) => {
+app.action("stop_codex", async ({ ack, body, client }) => {
   await ack();
 
   try {
     const { channel, message } = body as any;
-    const processKey = openhandsManager.getProcessKey(channel.id, message.ts);
+    const processKey = codexManager.getProcessKey(channel.id, message.ts);
 
     logger.info("Stop button pressed", { processKey });
 
-    if (openhandsManager.stopProcess(processKey)) {
+    if (codexManager.stopProcess(processKey)) {
       const currentOutput = outputBuffer.get(processKey) || "";
 
       await client.chat.update({
@@ -243,7 +227,7 @@ app.action("stop_openhands", async ({ ack, body, client }) => {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: "⏹️ OpenHandsプロセスを停止しました",
+              text: "⏹️ Codexプロセスを停止しました",
             },
           },
         ],
@@ -256,50 +240,6 @@ app.action("stop_openhands", async ({ ack, body, client }) => {
   }
 });
 
-// Approveボタンのアクション
-app.action("approve_openhands", async ({ ack, body, client }) => {
-  await ack();
-
-  try {
-    const { channel, message } = body as any;
-    const processKey = openhandsManager.getProcessKey(channel.id, message.ts);
-
-    if (openhandsManager.sendApproval(processKey, "y")) {
-      const currentOutput = outputBuffer.get(processKey) || "";
-
-      await client.chat.update({
-        channel: channel.id,
-        ts: message.ts,
-        blocks: createOutputBlock(currentOutput + "\n✅ 承認されました", true),
-      });
-    }
-  } catch (error) {
-    console.error("Error approving process:", error);
-  }
-});
-
-// Denyボタンのアクション
-app.action("deny_openhands", async ({ ack, body, client }) => {
-  await ack();
-
-  try {
-    const { channel, message } = body as any;
-    const processKey = openhandsManager.getProcessKey(channel.id, message.ts);
-
-    if (openhandsManager.sendApproval(processKey, "n")) {
-      const currentOutput = outputBuffer.get(processKey) || "";
-
-      await client.chat.update({
-        channel: channel.id,
-        ts: message.ts,
-        blocks: createOutputBlock(currentOutput + "\n❌ 拒否されました", true),
-      });
-    }
-  } catch (error) {
-    console.error("Error denying process:", error);
-  }
-});
-
 // アプリケーションを開始
 const startApp = async (): Promise<void> => {
   try {
@@ -307,7 +247,7 @@ const startApp = async (): Promise<void> => {
     logger.info("⚡️ Slack Hands Bot is running!");
     logger.info(`📁 Repository: ${config.repository}`);
     logger.info(`🤖 Model: ${config.model} (${config.provider})`);
-    logger.info(`📂 Workspace: ${config.openhandsWorkspace}`);
+    logger.info(`📂 Workspace: ${config.workspace}`);
   } catch (error) {
     logger.error("Failed to start the app:", error);
     process.exit(1);
@@ -317,13 +257,13 @@ const startApp = async (): Promise<void> => {
 // 終了時のクリーンアップ
 process.on("SIGINT", () => {
   logger.info("⏹️ Shutting down...");
-  openhandsManager.stopAllProcesses();
+  codexManager.stopAllProcesses();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
   logger.info("⏹️ Shutting down...");
-  openhandsManager.stopAllProcesses();
+  codexManager.stopAllProcesses();
   process.exit(0);
 });
 

@@ -2,7 +2,7 @@ export type Config = {
   repository: string;
   model: string;
   provider: string;
-  openhandsWorkspace: string;
+  workspace: string;
   maxIterations: number;
   environment: Record<string, string>;
 };
