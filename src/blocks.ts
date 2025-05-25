@@ -264,7 +264,7 @@ export const createInteractiveChoiceBlock = (
         type: "button" as const,
         text: {
           type: "plain_text" as const,
-          text: choice.isSelected ? `> ${choice.text}` : choice.text,
+          text: choice.text,
         },
         style: choice.isSelected ? ("primary" as const) : undefined,
         action_id: `interactive_choice_${choice.value}`,
@@ -278,25 +278,6 @@ export const createInteractiveChoiceBlock = (
       type: "actions",
       elements: actionElements,
     });
-
-    // Enterキーで選択される選択肢がある場合、追加の説明を表示
-    if (selectedChoice) {
-      blocks.push({
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: {
-              type: "plain_text",
-              text: "⏎ Enter (デフォルト選択を実行)",
-            },
-            style: "primary",
-            action_id: `interactive_choice_${selectedChoice.value}_enter`,
-            value: selectedChoice.value,
-          },
-        ],
-      });
-    }
   } else {
     console.log("No choices to add buttons for");
   }
