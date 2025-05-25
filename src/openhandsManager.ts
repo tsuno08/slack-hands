@@ -163,6 +163,27 @@ export class OpenHandsManager extends EventEmitter {
     return false;
   };
 
+  public sendInteractiveChoice = (
+    processKey: string,
+    choice: string
+  ): boolean => {
+    const process = this.processes.get(processKey);
+    if (process && process.stdin) {
+      process.stdin.write(choice + "\n");
+      return true;
+    }
+    return false;
+  };
+
+  public sendEnterKey = (processKey: string): boolean => {
+    const process = this.processes.get(processKey);
+    if (process && process.stdin) {
+      process.stdin.write("\n");
+      return true;
+    }
+    return false;
+  };
+
   public getProcessKey = (channel: string, ts: string): string => {
     return `${channel}-${ts}`;
   };

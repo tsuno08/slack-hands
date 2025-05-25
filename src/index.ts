@@ -10,6 +10,8 @@ import {
   createApprovalBlock,
   createCompletedBlock,
   detectApprovalNeeded,
+  detectInteractiveChoices,
+  createInteractiveChoiceBlock,
 } from "./blocks";
 
 // 環境変数を読み込み
@@ -111,8 +113,18 @@ openhandsManager.on("output", async ({ channel, ts, output }) => {
 
     const isRunning = openhandsManager.isProcessRunning(processKey);
 
+    // インタラクティブな選択肢をチェック
+    const interactiveChoices = detectInteractiveChoices(output);
+    if (interactiveChoices.length > 0) {
+      logger.info("Interactive choices detected", { processKey, choices: interactiveChoices });
+      await app.client.chat.update({
+        channel: channel,
+        ts: ts,
+        blocks: createInteractiveChoiceBlock(SlackUtils.truncateOutput(newOutput), interactiveChoices),
+      });
+    } 
     // 承認が必要かチェック
-    if (detectApprovalNeeded(output)) {
+    else if (detectApprovalNeeded(output)) {
       logger.info("Approval required detected", { processKey });
       await app.client.chat.update({
         channel: channel,
@@ -268,6 +280,43 @@ app.action("deny_openhands", async ({ ack, body, client }) => {
     }
   } catch (error) {
     console.error("Error denying process:", error);
+  }
+});
+
+// インタラクティブ選択肢ボタンのアクション
+app.action("interactive_choice", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    const { channel, message, actions } = body as any;
+    const processKey = openhandsManager.getProcessKey(channel.id, message.ts);
+    const selectedValue = actions[0]?.value;
+    const buttonText = actions[0]?.text?.text || "";
+
+    let success = false;
+    let actionMessage = "";
+
+    if (buttonText.includes("Enter")) {
+      // Enterキーが押された場合（デフォルト選択を実行）
+      success = openhandsManager.sendEnterKey(processKey);
+      actionMessage = "⏎ デフォルト選択を実行しました";
+    } else if (selectedValue) {
+      // 特定の選択肢が選ばれた場合
+      success = openhandsManager.sendInteractiveChoice(processKey, selectedValue);
+      actionMessage = `🔹 選択: ${selectedValue}`;
+    }
+
+    if (success) {
+      const currentOutput = outputBuffer.get(processKey) || "";
+
+      await client.chat.update({
+        channel: channel.id,
+        ts: message.ts,
+        blocks: createOutputBlock(currentOutput + `\n${actionMessage}`, true),
+      });
+    }
+  } catch (error) {
+    console.error("Error handling interactive choice:", error);
   }
 });
 
