@@ -309,7 +309,7 @@ app.action("deny_openhands", async ({ ack, body, client }) => {
 });
 
 // インタラクティブ選択肢ボタンのアクション
-app.action("interactive_choice", async ({ ack, body, client }) => {
+app.action(/^interactive_choice_/, async ({ ack, body, client }) => {
   await ack();
 
   try {
