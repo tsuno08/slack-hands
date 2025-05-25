@@ -1,21 +1,47 @@
 import { App } from "@slack/bolt";
+import dotenv from "dotenv";
 import { CodexManager } from "./codexManager";
 import { SlackUtils } from "./utils";
 import { logger } from "./logger";
-import { initializeConfig } from "./env";
 import {
   createLoadingBlock,
   createOutputBlock,
   createCompletedBlock,
 } from "./blocks";
 
-const config = initializeConfig();
+// 環境変数を読み込み
+dotenv.config();
+
+// 必要な環境変数のチェック
+const requiredEnvVars = [
+  "SLACK_BOT_TOKEN",
+  "SLACK_APP_TOKEN",
+  "SLACK_SIGNING_SECRET",
+  "OPENAI_API_KEY",
+  "OPENROUTER_API_KEY",
+  "OPENROUTER_BASE_URL",
+  "OPENROUTER_MODEL",
+  "PROVIDER",
+  "REPOSITORY",
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`${envVar} environment variable is required`);
+  }
+}
+
+logger.info("Configuration loaded successfully", {
+  repository: process.env.REPOSITORY,
+  model: process.env.OPENROUTER_MODEL || "openai/gpt-4",
+  provider: process.env.PROVIDER || "openai",
+});
 
 // Slack Bolt アプリを初期化
 const app = new App({
-  token: config.botToken,
-  appToken: config.appToken,
-  signingSecret: config.signingSecret,
+  token: process.env.SLACK_BOT_TOKEN,
+  appToken: process.env.SLACK_APP_TOKEN,
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
   socketMode: true,
 });
 
@@ -34,6 +60,36 @@ app.event("app_mention", async ({ event, client }) => {
 
     // ボットのメンション部分を除去してタスクを取得
     const task = SlackUtils.extractMentionText(text);
+
+    // ヘルプコマンドの処理
+    if (!task || task.toLowerCase().includes("help") || task === "?") {
+      logger.info("Help command requested", { channel, user });
+      await client.chat.postMessage({
+        channel: channel,
+        text: `🤖 *Slack Codex Bot* へようこそ！
+
+使用方法:
+\`@${app.client.token ? "bot" : "slack-codex"} [タスクの説明]\`
+
+例:
+• \`@bot ウェブサイトにログイン機能を追加して\`
+• \`@bot バグを修正してください\`
+• \`@bot READMEファイルを更新して\`
+
+機能:
+• 🔄 リアルタイム出力表示
+• ⏹️ プロセス停止
+• 📁 Git リポジトリ連携
+
+設定:
+• Repository: ${process.env.REPOSITORY}
+• Model: ${process.env.OPENROUTER_MODEL || "openai/gpt-4"} (${
+          process.env.PROVIDER || "openai"
+        })`,
+        thread_ts: ts,
+      });
+      return;
+    }
 
     if (!task) {
       logger.warn("Empty task received", { channel, user, ts });
@@ -204,7 +260,13 @@ app.action("stop_codex", async ({ ack, body, client }) => {
 const startApp = async (): Promise<void> => {
   try {
     await app.start();
-    logger.info("⚡️ Slack Hands Bot is running!");
+    logger.info("⚡️ Slack Codex Bot is running!");
+    logger.info(`📁 Repository: ${process.env.REPOSITORY}`);
+    logger.info(
+      `🤖 Model: ${process.env.OPENROUTER_MODEL || "openai/gpt-4"} (${
+        process.env.PROVIDER || "openai"
+      })`
+    );
   } catch (error) {
     logger.error("Failed to start the app:", error);
     process.exit(1);
