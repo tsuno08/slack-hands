@@ -1,10 +1,16 @@
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import * as pty from "node-pty";
 import { Config } from "./types";
 import { logger } from "./logger";
 
+type PtyProcess = {
+  pty: pty.IPty;
+  containerName: string;
+};
+
 export class OpenHandsManager extends EventEmitter {
-  private processes: Map<string, ChildProcess> = new Map();
+  private processes: Map<string, PtyProcess> = new Map();
   private config: Config;
 
   constructor(config: Config) {
@@ -42,7 +48,7 @@ export class OpenHandsManager extends EventEmitter {
 
       const args = [
         "run",
-        "-i",
+        "-it", // -i -t フラグを組み合わせてTTYモードを有効にする
         "--rm",
         "--pull=always",
         "-e",
@@ -71,29 +77,33 @@ export class OpenHandsManager extends EventEmitter {
 
       logger.debug("OpenHands Docker command args:", args);
 
-      const openhandsProcess = spawn("docker", args, {
-        stdio: ["pipe", "pipe", "pipe"],
+      // node-ptyを使用してTTY環境でプロセスを起動
+      const ptyProcess = pty.spawn("docker", args, {
+        name: "xterm-color",
+        cols: 120,
+        rows: 30,
+        cwd: process.cwd(),
         env: {
           ...process.env,
           ...this.config.environment,
+          TERM: "xterm-256color",
         },
       });
 
-      this.processes.set(processKey, openhandsProcess);
+      const ptyData: PtyProcess = {
+        pty: ptyProcess,
+        containerName,
+      };
 
-      openhandsProcess.stdout?.on("data", (data: Buffer) => {
-        const output = data.toString();
-        logger.debug(`OpenHands stdout [${processKey}]:`, output.trim());
-        this.emit("output", { channel, ts, output });
+      this.processes.set(processKey, ptyData);
+
+      ptyProcess.onData((data: string) => {
+        logger.debug(`OpenHands output [${processKey}]:`, data.trim());
+        this.emit("output", { channel, ts, output: data });
       });
 
-      openhandsProcess.stderr?.on("data", (data: Buffer) => {
-        const error = data.toString();
-        logger.warn(`OpenHands stderr [${processKey}]:`, error.trim());
-        this.emit("error", { channel, ts, error });
-      });
-
-      openhandsProcess.on("close", (code: number | null) => {
+      ptyProcess.onExit((exitCode) => {
+        const code = exitCode.exitCode;
         logger.info(
           `OpenHands process closed [${processKey}] with code:`,
           code
@@ -102,21 +112,15 @@ export class OpenHandsManager extends EventEmitter {
         this.emit("close", { channel, ts, code });
       });
 
-      openhandsProcess.on("error", (error: Error) => {
-        logger.error(`OpenHands process error [${processKey}]:`, error);
-        this.processes.delete(processKey);
-        reject(error);
-      });
-
       // プロセスが正常に開始されたことを確認
       setTimeout(() => {
         if (this.processes.has(processKey)) {
           logger.info(`OpenHands process successfully started [${processKey}]`);
 
           // タスクをOpenHandsに送信
-          const process = this.processes.get(processKey);
-          if (process && process.stdin) {
-            process.stdin.write(message + "\n");
+          const processData = this.processes.get(processKey);
+          if (processData) {
+            processData.pty.write(message + "\r");
           }
 
           resolve(processKey);
@@ -129,10 +133,10 @@ export class OpenHandsManager extends EventEmitter {
   };
 
   public stopProcess = (processKey: string): boolean => {
-    const process = this.processes.get(processKey);
-    if (process && !process.killed) {
+    const processData = this.processes.get(processKey);
+    if (processData) {
       logger.info(`Stopping OpenHands process [${processKey}]`);
-      process.kill("SIGTERM");
+      processData.pty.kill();
       this.processes.delete(processKey);
       return true;
     }
@@ -147,17 +151,17 @@ export class OpenHandsManager extends EventEmitter {
   };
 
   public isProcessRunning = (processKey: string): boolean => {
-    const process = this.processes.get(processKey);
-    return process !== undefined && !process.killed;
+    const processData = this.processes.get(processKey);
+    return processData !== undefined && processData.pty.pid !== undefined;
   };
 
   public sendApproval = (
     processKey: string,
     approval: string = "y"
   ): boolean => {
-    const process = this.processes.get(processKey);
-    if (process && process.stdin) {
-      process.stdin.write(approval + "\n");
+    const processData = this.processes.get(processKey);
+    if (processData) {
+      processData.pty.write(approval + "\r");
       return true;
     }
     return false;
@@ -170,16 +174,15 @@ export class OpenHandsManager extends EventEmitter {
     console.log(`=== Sending interactive choice ===`);
     console.log(`Process key: ${processKey}`);
     console.log(`Choice: "${choice}"`);
-    const process = this.processes.get(processKey);
-    if (process && process.stdin) {
-      console.log(`Writing to stdin: "${choice}\\n"`);
-      process.stdin.write(choice + "\n");
-      console.log(`Successfully wrote to stdin`);
+    const processData = this.processes.get(processKey);
+    if (processData) {
+      console.log(`Writing to pty: "${choice}\\r"`);
+      processData.pty.write(choice + "\r");
+      console.log(`Successfully wrote to pty`);
       return true;
     } else {
-      console.log(`Process not found or stdin not available`);
-      console.log(`Process exists: ${!!process}`);
-      console.log(`Stdin exists: ${!!(process && process.stdin)}`);
+      console.log(`Process not found`);
+      console.log(`Process exists: ${!!processData}`);
     }
     return false;
   };
@@ -193,8 +196,8 @@ export class OpenHandsManager extends EventEmitter {
     console.log(`Process key: ${processKey}`);
     console.log(`Target index: ${targetIndex}, Current index: ${currentIndex}`);
 
-    const process = this.processes.get(processKey);
-    if (process && process.stdin) {
+    const processData = this.processes.get(processKey);
+    if (processData) {
       // 目標インデックスまでの距離を計算
       const steps = targetIndex - currentIndex;
 
@@ -202,34 +205,33 @@ export class OpenHandsManager extends EventEmitter {
         // 下に移動（下矢印キー）
         for (let i = 0; i < steps; i++) {
           console.log(`Sending down arrow key (step ${i + 1}/${steps})`);
-          process.stdin.write("\x1B[B"); // 下矢印キー
+          processData.pty.write("\x1B[B"); // 下矢印キー
         }
       } else if (steps < 0) {
         // 上に移動（上矢印キー）
         const upSteps = Math.abs(steps);
         for (let i = 0; i < upSteps; i++) {
           console.log(`Sending up arrow key (step ${i + 1}/${upSteps})`);
-          process.stdin.write("\x1B[A"); // 上矢印キー
+          processData.pty.write("\x1B[A"); // 上矢印キー
         }
       }
 
       // 最後にEnterキーを送信
       console.log(`Sending Enter key`);
-      process.stdin.write("\n");
+      processData.pty.write("\r");
       console.log(`Successfully completed interactive choice selection`);
       return true;
     } else {
-      console.log(`Process not found or stdin not available`);
-      console.log(`Process exists: ${!!process}`);
-      console.log(`Stdin exists: ${!!(process && process.stdin)}`);
+      console.log(`Process not found`);
+      console.log(`Process exists: ${!!processData}`);
     }
     return false;
   };
 
   public sendEnterKey = (processKey: string): boolean => {
-    const process = this.processes.get(processKey);
-    if (process && process.stdin) {
-      process.stdin.write("\n");
+    const processData = this.processes.get(processKey);
+    if (processData) {
+      processData.pty.write("\r");
       return true;
     }
     return false;
