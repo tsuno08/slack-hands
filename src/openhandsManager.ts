@@ -295,4 +295,21 @@ export class OpenHandsManager extends EventEmitter {
     const processData = this.processes.get(processKey);
     return processData?.isLoading ?? false;
   };
+
+  public sendFreeInput = (processKey: string, input: string): boolean => {
+    console.log(`=== Sending free input ===`);
+    console.log(`Process key: ${processKey}`);
+    console.log(`Input: "${input}"`);
+    const processData = this.processes.get(processKey);
+    if (processData) {
+      console.log(`Writing to pty: "${input}\\r"`);
+      processData.pty.write(input + "\r");
+      console.log(`Successfully wrote free input to pty`);
+      return true;
+    } else {
+      console.log(`Process not found`);
+      console.log(`Process exists: ${!!processData}`);
+    }
+    return false;
+  };
 }

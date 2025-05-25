@@ -12,6 +12,8 @@ import {
   detectApprovalNeeded,
   detectInteractiveChoices,
   createInteractiveChoiceBlock,
+  createFreeInputBlock,
+  createFreeInputModal,
 } from "./blocks";
 
 // 環境変数を読み込み
@@ -40,6 +42,8 @@ const openhandsManager = new OpenHandsManager(config);
 
 // 出力を蓄積するためのマップ
 const outputBuffer = new Map<string, string>();
+// メンション時のテキストを保存するためのマップ
+const mentionBuffer = new Map<string, string>();
 
 // app_mention イベントのハンドラー
 app.event("app_mention", async ({ event, client }) => {
@@ -76,6 +80,9 @@ app.event("app_mention", async ({ event, client }) => {
 
     const processKey = openhandsManager.getProcessKey(channel, response.ts);
     outputBuffer.set(processKey, "");
+
+    // メンション時のテキストを保存
+    mentionBuffer.set(processKey, task);
 
     try {
       // OpenHandsプロセスを開始
@@ -115,14 +122,45 @@ openhandsManager.on("output", async ({ channel, ts, output }) => {
 
     // インタラクティブな選択肢をチェック
     const interactiveResult = detectInteractiveChoices(output);
-    const { choices: interactiveChoices, filteredOutput } = interactiveResult;
+    const {
+      choices: interactiveChoices,
+      filteredOutput,
+      isFreeInput,
+    } = interactiveResult;
     console.log("=== Interactive Choice Detection Result ===");
     console.log("Raw output:", output);
     console.log("Filtered output:", filteredOutput);
     console.log("Detected choices:", interactiveChoices);
     console.log("Choices length:", interactiveChoices.length);
+    console.log("Is free input:", isFreeInput);
 
-    if (interactiveChoices.length > 0) {
+    if (isFreeInput) {
+      logger.info("Free input required detected", { processKey });
+      const mentionText = mentionBuffer.get(processKey) || "";
+      console.log("About to call createFreeInputBlock...");
+
+      try {
+        const blocks = createFreeInputBlock(
+          SlackUtils.truncateOutput(filteredOutput),
+          mentionText,
+          processKey
+        );
+        console.log("Generated free input blocks:", blocks);
+
+        await app.client.chat.update({
+          channel: channel,
+          ts: ts,
+          blocks: blocks,
+        });
+        console.log("Slack message updated with free input prompt");
+      } catch (slackError) {
+        console.error(
+          "Error updating Slack message with free input prompt:",
+          slackError
+        );
+        logger.error("Slack update error:", slackError);
+      }
+    } else if (interactiveChoices.length > 0) {
       logger.info("Interactive choices detected", {
         processKey,
         choices: interactiveChoices,
@@ -381,6 +419,76 @@ app.action(/^interactive_choice_/, async ({ ack, body, client }) => {
     }
   } catch (error) {
     console.error("Error handling interactive choice:", error);
+  }
+});
+
+// 自由入力モーダルを開くボタンのアクション
+app.action("open_free_input_modal", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    const { trigger_id } = body as any;
+    const actions = (body as any).actions;
+    const buttonValue = actions[0]?.value || "{}";
+
+    let mentionText = "";
+    let processKey = "";
+
+    try {
+      const parsed = JSON.parse(buttonValue);
+      mentionText = parsed.mentionText || "";
+      processKey = parsed.processKey || "";
+    } catch (e) {
+      // 古い形式の場合はmentionTextとして扱う
+      mentionText = buttonValue;
+    }
+
+    await client.views.open({
+      trigger_id,
+      view: createFreeInputModal(mentionText, processKey),
+    });
+  } catch (error) {
+    console.error("Error opening free input modal:", error);
+  }
+});
+
+// 自由入力モーダルの送信処理
+app.view("free_input_modal", async ({ ack, body, client }) => {
+  await ack();
+
+  try {
+    const { user, view } = body;
+    const values = view.state.values;
+    const inputValue = values.free_input_block.free_input_value.value || "";
+    const processKey = view.private_metadata || "";
+
+    if (processKey && inputValue.trim()) {
+      console.log(`=== Free Input Submitted ===`);
+      console.log(`Process key: ${processKey}`);
+      console.log(`Input value: "${inputValue}"`);
+
+      // 自由入力をOpenHandsに送信
+      const success = openhandsManager.sendFreeInput(
+        processKey,
+        inputValue.trim()
+      );
+
+      if (success) {
+        const parts = processKey.split("-");
+        const targetChannel = parts[0];
+        const targetTs = parts[1];
+        const currentOutput = outputBuffer.get(processKey) || "";
+        const actionMessage = `📝 入力: ${inputValue}`;
+
+        await client.chat.update({
+          channel: targetChannel,
+          ts: targetTs,
+          blocks: createOutputBlock(currentOutput + `\n${actionMessage}`, true),
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error handling free input modal submission:", error);
   }
 });
 

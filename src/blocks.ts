@@ -164,22 +164,37 @@ export const detectApprovalNeeded = (output: string): boolean => {
 
 export const detectInteractiveChoices = (
   output: string
-): { choices: InteractiveChoice[]; filteredOutput: string } => {
+): {
+  choices: InteractiveChoice[];
+  filteredOutput: string;
+  isFreeInput: boolean;
+} => {
   const lines = output.split("\n");
   const choices: InteractiveChoice[] = [];
 
   // "Do you wish to continue?" パターンを検出
   const questionPattern = /do you wish to continue\?/i;
+  // ">" だけの行を検出（自由入力パターン）
+  const freeInputPattern = /^>\s*$/;
 
   let foundQuestion = false;
   let choiceIndex = 0;
   let questionLineIndex = -1;
+  let isFreeInput = false;
 
   console.log("=== Detecting interactive choices ===");
   console.log("Output:", output);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+
+    // 自由入力パターンをチェック
+    if (freeInputPattern.test(line)) {
+      console.log("Found free input pattern at line", i);
+      isFreeInput = true;
+      questionLineIndex = i;
+      break;
+    }
 
     if (questionPattern.test(line)) {
       foundQuestion = true;
@@ -231,15 +246,16 @@ export const detectInteractiveChoices = (
     }
   }
 
-  // questionPatternが見つかった場合、その行以降のみを含むフィルタされた出力を作成
+  // questionPatternまたはfreeInputPatternが見つかった場合、その行以降のみを含むフィルタされた出力を作成
   const filteredOutput =
-    foundQuestion && questionLineIndex >= 0
+    (foundQuestion || isFreeInput) && questionLineIndex >= 0
       ? lines.slice(questionLineIndex).join("\n")
       : output;
 
   console.log("Final detected choices:", choices);
   console.log("Filtered output:", filteredOutput);
-  return { choices, filteredOutput };
+  console.log("Is free input:", isFreeInput);
+  return { choices, filteredOutput, isFreeInput };
 };
 
 export const createInteractiveChoiceBlock = (
@@ -302,3 +318,84 @@ export const createInteractiveChoiceBlock = (
   console.log("Final blocks structure:", JSON.stringify(blocks, null, 2));
   return blocks;
 };
+
+export const createFreeInputModal = (
+  mentionText?: string,
+  processKey?: string
+) => ({
+  type: "modal" as const,
+  callback_id: "free_input_modal",
+  private_metadata: processKey || "",
+  title: {
+    type: "plain_text" as const,
+    text: "入力してください",
+  },
+  submit: {
+    type: "plain_text" as const,
+    text: "送信",
+  },
+  close: {
+    type: "plain_text" as const,
+    text: "キャンセル",
+  },
+  blocks: [
+    {
+      type: "input",
+      block_id: "free_input_block",
+      element: {
+        type: "plain_text_input",
+        action_id: "free_input_value",
+        initial_value: mentionText || "",
+        placeholder: {
+          type: "plain_text" as const,
+          text: "ここに入力してください...",
+        },
+      },
+      label: {
+        type: "plain_text" as const,
+        text: "入力値",
+      },
+    },
+  ],
+});
+
+export const createFreeInputBlock = (
+  output: string,
+  mentionText?: string,
+  processKey?: string
+): (Block | KnownBlock)[] => [
+  {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `\`\`\`\n${
+        output.length > 2900 ? output.slice(-2900) + "..." : output
+      }\n\`\`\``,
+    },
+  },
+  {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: "✏️ 自由入力が必要です。下のボタンから入力してください：",
+    },
+  },
+  {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "入力する",
+        },
+        style: "primary",
+        action_id: "open_free_input_modal",
+        value: JSON.stringify({
+          mentionText: mentionText || "",
+          processKey: processKey || "",
+        }),
+      },
+    ],
+  },
+];
