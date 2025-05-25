@@ -167,10 +167,61 @@ export class OpenHandsManager extends EventEmitter {
     processKey: string,
     choice: string
   ): boolean => {
+    console.log(`=== Sending interactive choice ===`);
+    console.log(`Process key: ${processKey}`);
+    console.log(`Choice: "${choice}"`);
     const process = this.processes.get(processKey);
     if (process && process.stdin) {
+      console.log(`Writing to stdin: "${choice}\\n"`);
       process.stdin.write(choice + "\n");
+      console.log(`Successfully wrote to stdin`);
       return true;
+    } else {
+      console.log(`Process not found or stdin not available`);
+      console.log(`Process exists: ${!!process}`);
+      console.log(`Stdin exists: ${!!(process && process.stdin)}`);
+    }
+    return false;
+  };
+
+  public sendInteractiveChoiceByIndex = (
+    processKey: string,
+    targetIndex: number,
+    currentIndex: number
+  ): boolean => {
+    console.log(`=== Sending interactive choice by index ===`);
+    console.log(`Process key: ${processKey}`);
+    console.log(`Target index: ${targetIndex}, Current index: ${currentIndex}`);
+
+    const process = this.processes.get(processKey);
+    if (process && process.stdin) {
+      // 目標インデックスまでの距離を計算
+      const steps = targetIndex - currentIndex;
+
+      if (steps > 0) {
+        // 下に移動（下矢印キー）
+        for (let i = 0; i < steps; i++) {
+          console.log(`Sending down arrow key (step ${i + 1}/${steps})`);
+          process.stdin.write("\x1B[B"); // 下矢印キー
+        }
+      } else if (steps < 0) {
+        // 上に移動（上矢印キー）
+        const upSteps = Math.abs(steps);
+        for (let i = 0; i < upSteps; i++) {
+          console.log(`Sending up arrow key (step ${i + 1}/${upSteps})`);
+          process.stdin.write("\x1B[A"); // 上矢印キー
+        }
+      }
+
+      // 最後にEnterキーを送信
+      console.log(`Sending Enter key`);
+      process.stdin.write("\n");
+      console.log(`Successfully completed interactive choice selection`);
+      return true;
+    } else {
+      console.log(`Process not found or stdin not available`);
+      console.log(`Process exists: ${!!process}`);
+      console.log(`Stdin exists: ${!!(process && process.stdin)}`);
     }
     return false;
   };

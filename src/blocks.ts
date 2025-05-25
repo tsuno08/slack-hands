@@ -4,6 +4,7 @@ type InteractiveChoice = {
   text: string;
   value: string;
   isSelected?: boolean;
+  index: number; // 選択肢のインデックスを追加
 };
 
 export const createLoadingBlock = (): (Block | KnownBlock)[] => [
@@ -171,6 +172,7 @@ export const detectInteractiveChoices = (
   const questionPattern = /do you wish to continue\?/i;
 
   let foundQuestion = false;
+  let choiceIndex = 0;
 
   console.log("=== Detecting interactive choices ===");
   console.log("Output:", output);
@@ -193,18 +195,22 @@ export const detectInteractiveChoices = (
         console.log("Found selected choice:", text);
         choices.push({
           text,
-          value: text.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          value: choiceIndex.toString(), // インデックスを値として使用
           isSelected: true,
+          index: choiceIndex,
         });
+        choiceIndex++;
       }
       // ">" で始まらない行で、明らかに選択肢と思われるもの
       else if (line.match(/^(yes|no)/i)) {
         console.log("Found unselected choice:", line);
         choices.push({
           text: line,
-          value: line.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          value: choiceIndex.toString(), // インデックスを値として使用
           isSelected: false,
+          index: choiceIndex,
         });
+        choiceIndex++;
       }
       // YesとNoが確定なので、それらを直接検出
       else if (
@@ -214,9 +220,11 @@ export const detectInteractiveChoices = (
         console.log("Found Yes/No choice:", line);
         choices.push({
           text: line,
-          value: line.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          value: choiceIndex.toString(), // インデックスを値として使用
           isSelected: false,
+          index: choiceIndex,
         });
+        choiceIndex++;
       }
     }
   }
