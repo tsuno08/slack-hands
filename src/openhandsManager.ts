@@ -7,6 +7,8 @@ import { logger } from "./logger";
 type PtyProcess = {
   pty: pty.IPty;
   containerName: string;
+  isLoading: boolean;
+  awaitingNextOutput: boolean;
 };
 
 export class OpenHandsManager extends EventEmitter {
@@ -93,12 +95,37 @@ export class OpenHandsManager extends EventEmitter {
       const ptyData: PtyProcess = {
         pty: ptyProcess,
         containerName,
+        isLoading: false,
+        awaitingNextOutput: false,
       };
 
       this.processes.set(processKey, ptyData);
 
       ptyProcess.onData((data: string) => {
         logger.debug(`OpenHands output [${processKey}]:`, data.trim());
+
+        const processData = this.processes.get(processKey);
+        if (processData) {
+          // "Initializing..." の検出
+          if (data.includes("Initializing...")) {
+            logger.info(`Loading started for [${processKey}]`);
+            processData.isLoading = true;
+            processData.awaitingNextOutput = true;
+            this.emit("loadingStart", { channel, ts });
+          }
+          // loading中で次の出力を待機している場合
+          else if (
+            processData.isLoading &&
+            processData.awaitingNextOutput &&
+            data.trim() !== ""
+          ) {
+            logger.info(`Loading ended for [${processKey}]`);
+            processData.isLoading = false;
+            processData.awaitingNextOutput = false;
+            this.emit("loadingEnd", { channel, ts });
+          }
+        }
+
         this.emit("output", { channel, ts, output: data });
       });
 
@@ -108,6 +135,13 @@ export class OpenHandsManager extends EventEmitter {
           `OpenHands process closed [${processKey}] with code:`,
           code
         );
+
+        // loading状態をリセット
+        const processData = this.processes.get(processKey);
+        if (processData?.isLoading) {
+          this.emit("loadingEnd", { channel, ts });
+        }
+
         this.processes.delete(processKey);
         this.emit("close", { channel, ts, code });
       });
@@ -136,6 +170,17 @@ export class OpenHandsManager extends EventEmitter {
     const processData = this.processes.get(processKey);
     if (processData) {
       logger.info(`Stopping OpenHands process [${processKey}]`);
+
+      // loading状態をリセット
+      if (processData.isLoading) {
+        processData.isLoading = false;
+        processData.awaitingNextOutput = false;
+        this.emit("loadingEnd", {
+          channel: processKey.split("-")[0],
+          ts: processKey.split("-")[1],
+        });
+      }
+
       processData.pty.kill();
       this.processes.delete(processKey);
       return true;
@@ -239,5 +284,10 @@ export class OpenHandsManager extends EventEmitter {
 
   public getProcessKey = (channel: string, ts: string): string => {
     return `${channel}-${ts}`;
+  };
+
+  public isLoading = (processKey: string): boolean => {
+    const processData = this.processes.get(processKey);
+    return processData?.isLoading ?? false;
   };
 }
