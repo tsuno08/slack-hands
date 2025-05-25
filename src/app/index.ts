@@ -49,6 +49,8 @@ const openhandsManager = new OpenHandsManager(config);
 const outputBuffer = new Map<string, string>();
 // メンション時のテキストを保存するためのマップ
 const mentionBuffer = new Map<string, string>();
+// タイムアウト管理用のマップ
+const updateTimers = new Map<string, NodeJS.Timeout>();
 
 // イベントハンドラーを登録
 registerMentionEvent(app, openhandsManager, outputBuffer, mentionBuffer);
@@ -58,6 +60,15 @@ registerApprovalActions(app, openhandsManager, outputBuffer);
 registerStopAction(app, openhandsManager, outputBuffer);
 registerInteractiveActions(app, openhandsManager, outputBuffer);
 registerModalActions(app, openhandsManager, outputBuffer);
+
+// タイマーの停止を処理
+openhandsManager.on("stopTimer", ({ processKey }) => {
+  const existingTimer = updateTimers.get(processKey);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    updateTimers.delete(processKey);
+  }
+});
 
 // OpenHandsからの出力を処理
 openhandsManager.on("output", async ({ channel, ts, output }) => {
@@ -83,87 +94,160 @@ openhandsManager.on("output", async ({ channel, ts, output }) => {
     console.log("Choices length:", interactiveChoices.length);
     console.log("Is free input:", isFreeInput);
 
-    if (isFreeInput) {
-      logger.info("Free input required detected", { processKey });
-      const mentionText = mentionBuffer.get(processKey) || "";
-      console.log("About to call createFreeInputBlock...");
+    // 即座に更新が必要な場合（ユーザーアクションが必要）
+    const needsImmediateUpdate =
+      isFreeInput ||
+      interactiveChoices.length > 0 ||
+      detectApprovalNeeded(output);
 
-      try {
-        const blocks = createFreeInputBlock(
-          SlackUtils.truncateOutput(filteredOutput),
-          mentionText,
-          processKey
-        );
-        console.log("Generated free input blocks:", blocks);
-
-        await app.client.chat.update({
-          channel: channel,
-          ts: ts,
-          blocks: blocks,
-        });
-        console.log("Slack message updated with free input prompt");
-      } catch (slackError) {
-        console.error(
-          "Error updating Slack message with free input prompt:",
-          slackError
-        );
-        logger.error("Slack update error:", slackError);
+    if (needsImmediateUpdate) {
+      // 既存のタイマーをクリア
+      const existingTimer = updateTimers.get(processKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        updateTimers.delete(processKey);
       }
-    } else if (interactiveChoices.length > 0) {
-      logger.info("Interactive choices detected", {
+
+      // 即座に更新
+      await updateSlackMessage(
+        channel,
+        ts,
         processKey,
-        choices: interactiveChoices,
-      });
-      console.log("About to call createInteractiveChoiceBlock...");
-
-      try {
-        const blocks = createInteractiveChoiceBlock(
-          SlackUtils.truncateOutput(filteredOutput), // フィルタされた出力を使用
-          interactiveChoices
-        );
-        console.log("Generated blocks:", blocks);
-
-        await app.client.chat.update({
-          channel: channel,
-          ts: ts,
-          blocks: blocks,
-        });
-        console.log("Slack message updated with interactive choices");
-      } catch (slackError) {
-        console.error(
-          "Error updating Slack message with interactive choices:",
-          slackError
-        );
-        logger.error("Slack update error:", slackError);
-      }
-    }
-    // 承認が必要かチェック
-    else if (detectApprovalNeeded(output)) {
-      logger.info("Approval required detected", { processKey });
-      await app.client.chat.update({
-        channel: channel,
-        ts: ts,
-        blocks: createApprovalBlock(SlackUtils.truncateOutput(newOutput)),
-      });
+        newOutput,
+        filteredOutput,
+        interactiveChoices,
+        isFreeInput,
+        isRunning
+      );
     } else {
-      await app.client.chat.update({
-        channel: channel,
-        ts: ts,
-        blocks: createOutputBlock(
-          SlackUtils.truncateOutput(newOutput),
-          isRunning
-        ),
-      });
+      // 通常の出力の場合は5秒のタイムアウトを設定
+      const existingTimer = updateTimers.get(processKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      const timer = setTimeout(async () => {
+        try {
+          await updateSlackMessage(
+            channel,
+            ts,
+            processKey,
+            newOutput,
+            filteredOutput,
+            interactiveChoices,
+            isFreeInput,
+            isRunning
+          );
+          updateTimers.delete(processKey);
+        } catch (error) {
+          logger.error("Error in delayed update:", error);
+        }
+      }, 5000); // 5秒のタイムアウト
+
+      updateTimers.set(processKey, timer);
     }
   } catch (error) {
     logger.error("Error updating message with output:", error);
   }
 });
 
+// Slackメッセージ更新のヘルパー関数
+const updateSlackMessage = async (
+  channel: string,
+  ts: string,
+  processKey: string,
+  newOutput: string,
+  filteredOutput: string,
+  interactiveChoices: any[],
+  isFreeInput: boolean,
+  isRunning: boolean
+): Promise<void> => {
+  if (isFreeInput) {
+    logger.info("Free input required detected", { processKey });
+    const mentionText = mentionBuffer.get(processKey) || "";
+    console.log("About to call createFreeInputBlock...");
+
+    try {
+      const blocks = createFreeInputBlock(
+        SlackUtils.truncateOutput(filteredOutput),
+        mentionText,
+        processKey
+      );
+      console.log("Generated free input blocks:", blocks);
+
+      await app.client.chat.update({
+        channel: channel,
+        ts: ts,
+        blocks: blocks,
+      });
+      console.log("Slack message updated with free input prompt");
+    } catch (slackError) {
+      console.error(
+        "Error updating Slack message with free input prompt:",
+        slackError
+      );
+      logger.error("Slack update error:", slackError);
+    }
+  } else if (interactiveChoices.length > 0) {
+    logger.info("Interactive choices detected", {
+      processKey,
+      choices: interactiveChoices,
+    });
+    console.log("About to call createInteractiveChoiceBlock...");
+
+    try {
+      const blocks = createInteractiveChoiceBlock(
+        SlackUtils.truncateOutput(filteredOutput), // フィルタされた出力を使用
+        interactiveChoices
+      );
+      console.log("Generated blocks:", blocks);
+
+      await app.client.chat.update({
+        channel: channel,
+        ts: ts,
+        blocks: blocks,
+      });
+      console.log("Slack message updated with interactive choices");
+    } catch (slackError) {
+      console.error(
+        "Error updating Slack message with interactive choices:",
+        slackError
+      );
+      logger.error("Slack update error:", slackError);
+    }
+  }
+  // 承認が必要かチェック
+  else if (detectApprovalNeeded(newOutput)) {
+    logger.info("Approval required detected", { processKey });
+    await app.client.chat.update({
+      channel: channel,
+      ts: ts,
+      blocks: createApprovalBlock(SlackUtils.truncateOutput(newOutput)),
+    });
+  } else {
+    await app.client.chat.update({
+      channel: channel,
+      ts: ts,
+      blocks: createOutputBlock(
+        SlackUtils.truncateOutput(newOutput),
+        isRunning
+      ),
+    });
+  }
+};
+
 // OpenHandsプロセスが終了したときの処理
 openhandsManager.on("close", async ({ channel, ts, code }) => {
   try {
     const processKey = openhandsManager.getProcessKey(channel, ts);
+
+    // 保留中のタイマーをクリア
+    const existingTimer = updateTimers.get(processKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      updateTimers.delete(processKey);
+    }
+
     const finalOutput = outputBuffer.get(processKey) || "";
 
     await app.client.chat.update({
@@ -182,6 +266,14 @@ openhandsManager.on("close", async ({ channel, ts, code }) => {
 openhandsManager.on("error", async ({ channel, ts, error }) => {
   try {
     const processKey = openhandsManager.getProcessKey(channel, ts);
+
+    // 保留中のタイマーをクリア
+    const existingTimer = updateTimers.get(processKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      updateTimers.delete(processKey);
+    }
+
     const currentOutput = outputBuffer.get(processKey) || "";
     const errorOutput = currentOutput + `\nError: ${error}`;
 
@@ -227,12 +319,22 @@ const startApp = async (): Promise<void> => {
 // 終了時のクリーンアップ
 process.on("SIGINT", () => {
   logger.info("⏹️ Shutting down...");
+
+  // すべてのタイマーをクリア
+  updateTimers.forEach((timer) => clearTimeout(timer));
+  updateTimers.clear();
+
   openhandsManager.stopAllProcesses();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
   logger.info("⏹️ Shutting down...");
+
+  // すべてのタイマーをクリア
+  updateTimers.forEach((timer) => clearTimeout(timer));
+  updateTimers.clear();
+
   openhandsManager.stopAllProcesses();
   process.exit(0);
 });

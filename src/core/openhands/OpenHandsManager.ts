@@ -186,6 +186,9 @@ export class OpenHandsManager extends EventEmitter {
         });
       }
 
+      // タイマーの停止を通知
+      this.emit("stopTimer", { processKey });
+
       processData.pty.kill();
       this.processes.delete(processKey);
       return true;

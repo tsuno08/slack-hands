@@ -29,6 +29,7 @@ export type OpenHandsEvent = {
   output?: string;
   error?: string;
   code?: number;
+  processKey?: string;
 };
 
 export type ProcessKey = string;
