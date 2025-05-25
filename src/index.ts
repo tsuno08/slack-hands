@@ -1,6 +1,5 @@
 import { App } from "@slack/bolt";
 import dotenv from "dotenv";
-import { loadConfig, validateConfig } from "./config";
 import { CodexManager } from "./codexManager";
 import { SlackUtils } from "./utils";
 import { logger } from "./logger";
@@ -13,14 +12,29 @@ import {
 // 環境変数を読み込み
 dotenv.config();
 
-// 設定を読み込み
-const config = loadConfig();
-validateConfig(config);
+// 必要な環境変数のチェック
+const requiredEnvVars = [
+  "SLACK_BOT_TOKEN",
+  "SLACK_APP_TOKEN",
+  "SLACK_SIGNING_SECRET",
+  "OPENAI_API_KEY",
+  "OPENROUTER_API_KEY",
+  "OPENROUTER_BASE_URL",
+  "OPENROUTER_MODEL",
+  "PROVIDER",
+  "REPOSITORY",
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`${envVar} environment variable is required`);
+  }
+}
 
 logger.info("Configuration loaded successfully", {
-  repository: config.repository,
-  model: config.model,
-  provider: config.provider,
+  repository: process.env.REPOSITORY,
+  model: process.env.OPENROUTER_MODEL || "openai/gpt-4",
+  provider: process.env.PROVIDER || "openai",
 });
 
 // Slack Bolt アプリを初期化
@@ -32,7 +46,7 @@ const app = new App({
 });
 
 // Codex マネージャーを初期化
-const codexManager = new CodexManager(config);
+const codexManager = new CodexManager();
 
 // 出力を蓄積するためのマップ
 const outputBuffer = new Map<string, string>();
@@ -68,8 +82,10 @@ app.event("app_mention", async ({ event, client }) => {
 • 📁 Git リポジトリ連携
 
 設定:
-• Repository: ${config.repository}
-• Model: ${config.model} (${config.provider})`,
+• Repository: ${process.env.REPOSITORY}
+• Model: ${process.env.OPENROUTER_MODEL || "openai/gpt-4"} (${
+          process.env.PROVIDER || "openai"
+        })`,
         thread_ts: ts,
       });
       return;
@@ -245,8 +261,12 @@ const startApp = async (): Promise<void> => {
   try {
     await app.start();
     logger.info("⚡️ Slack Hands Bot is running!");
-    logger.info(`📁 Repository: ${config.repository}`);
-    logger.info(`🤖 Model: ${config.model} (${config.provider})`);
+    logger.info(`📁 Repository: ${process.env.REPOSITORY}`);
+    logger.info(
+      `🤖 Model: ${process.env.OPENROUTER_MODEL || "openai/gpt-4"} (${
+        process.env.PROVIDER || "openai"
+      })`
+    );
   } catch (error) {
     logger.error("Failed to start the app:", error);
     process.exit(1);

@@ -1,10 +1,3 @@
-export type Config = {
-  repository: string;
-  model: string;
-  provider: string;
-  environment: Record<string, string>;
-};
-
 export type SlackMessage = {
   channel: string;
   ts: string;

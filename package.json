@@ -1,19 +1,19 @@
 {
   "name": "slack-hands",
   "version": "1.0.0",
-  "description": "Slack Bot for codex CLI integration",
+  "description": "Slack Bot for Codex CLI integration",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "check-config": "tsx scripts/check-config.ts",
-    "setup": "cp .env.example .env && cp config.example.json config.json"
+    "setup": "cp .env.example .env"
   },
   "keywords": [
     "slack",
     "bot",
+    "codex",
     "cli",
     "coding"
   ],
