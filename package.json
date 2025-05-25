@@ -26,7 +26,8 @@
     "@slack/types": "^2.14.0",
     "@slack/web-api": "^7.9.2",
     "dotenv": "^16.5.0",
-    "node-pty": "^1.0.0"
+    "node-pty": "^1.0.0",
+    "strip-ansi": "^7.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
