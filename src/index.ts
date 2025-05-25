@@ -115,14 +115,39 @@ openhandsManager.on("output", async ({ channel, ts, output }) => {
 
     // インタラクティブな選択肢をチェック
     const interactiveChoices = detectInteractiveChoices(output);
+    console.log("=== Interactive Choice Detection Result ===");
+    console.log("Raw output:", output);
+    console.log("Detected choices:", interactiveChoices);
+    console.log("Choices length:", interactiveChoices.length);
+
     if (interactiveChoices.length > 0) {
-      logger.info("Interactive choices detected", { processKey, choices: interactiveChoices });
-      await app.client.chat.update({
-        channel: channel,
-        ts: ts,
-        blocks: createInteractiveChoiceBlock(SlackUtils.truncateOutput(newOutput), interactiveChoices),
+      logger.info("Interactive choices detected", {
+        processKey,
+        choices: interactiveChoices,
       });
-    } 
+      console.log("About to call createInteractiveChoiceBlock...");
+
+      try {
+        const blocks = createInteractiveChoiceBlock(
+          SlackUtils.truncateOutput(newOutput),
+          interactiveChoices
+        );
+        console.log("Generated blocks:", blocks);
+
+        await app.client.chat.update({
+          channel: channel,
+          ts: ts,
+          blocks: blocks,
+        });
+        console.log("Slack message updated with interactive choices");
+      } catch (slackError) {
+        console.error(
+          "Error updating Slack message with interactive choices:",
+          slackError
+        );
+        logger.error("Slack update error:", slackError);
+      }
+    }
     // 承認が必要かチェック
     else if (detectApprovalNeeded(output)) {
       logger.info("Approval required detected", { processKey });
@@ -302,7 +327,10 @@ app.action("interactive_choice", async ({ ack, body, client }) => {
       actionMessage = "⏎ デフォルト選択を実行しました";
     } else if (selectedValue) {
       // 特定の選択肢が選ばれた場合
-      success = openhandsManager.sendInteractiveChoice(processKey, selectedValue);
+      success = openhandsManager.sendInteractiveChoice(
+        processKey,
+        selectedValue
+      );
       actionMessage = `🔹 選択: ${selectedValue}`;
     }
 

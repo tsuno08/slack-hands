@@ -169,42 +169,59 @@ export const detectInteractiveChoices = (
 
   // "Do you wish to continue?" パターンを検出
   const questionPattern = /do you wish to continue\?/i;
-  const selectedChoicePattern = /^>\s*(.+)$/; // "> " で始まる行（選択されている）
-  const unselectedChoicePattern = /^([A-Za-z][^,\n>]*),?\s*$/; // ">" で始まらない選択肢
 
   let foundQuestion = false;
+
+  console.log("=== Detecting interactive choices ===");
+  console.log("Output:", output);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
     if (questionPattern.test(line)) {
       foundQuestion = true;
+      console.log("Found question at line", i);
       continue;
     }
 
     if (foundQuestion && line) {
-      // "> Yes, proceed" 形式（選択されている）
-      const selectedMatch = line.match(selectedChoicePattern);
-      if (selectedMatch) {
-        const text = selectedMatch[1].trim();
+      console.log(`Processing line ${i}: "${line}"`);
+
+      // "> " で始まる行（選択されている）
+      if (line.startsWith(">")) {
+        const text = line.substring(1).trim();
+        console.log("Found selected choice:", text);
         choices.push({
           text,
           value: text.toLowerCase().replace(/[^a-z0-9]/g, "_"),
           isSelected: true,
         });
       }
-      // "No, exit" 形式（選択されていない）
-      else if (unselectedChoicePattern.test(line) && !line.includes("?")) {
-        const text = line.replace(/,$/, "").trim();
+      // ">" で始まらない行で、明らかに選択肢と思われるもの
+      else if (line.match(/^(yes|no|ok|cancel|continue|exit|proceed|abort)/i)) {
+        console.log("Found unselected choice:", line);
         choices.push({
-          text,
-          value: text.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          text: line,
+          value: line.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          isSelected: false,
+        });
+      }
+      // YesとNoが確定なので、それらを直接検出
+      else if (
+        line.toLowerCase().includes("yes") ||
+        line.toLowerCase().includes("no")
+      ) {
+        console.log("Found Yes/No choice:", line);
+        choices.push({
+          text: line,
+          value: line.toLowerCase().replace(/[^a-z0-9]/g, "_"),
           isSelected: false,
         });
       }
     }
   }
 
+  console.log("Final detected choices:", choices);
   return choices;
 };
 
@@ -212,6 +229,9 @@ export const createInteractiveChoiceBlock = (
   output: string,
   choices: InteractiveChoice[]
 ): (Block | KnownBlock)[] => {
+  console.log("=== Creating interactive choice block ===");
+  console.log("Choices received:", JSON.stringify(choices, null, 2));
+
   const selectedChoice = choices.find((choice) => choice.isSelected);
 
   const blocks: (Block | KnownBlock)[] = [
@@ -233,39 +253,54 @@ export const createInteractiveChoiceBlock = (
           : "🤔 選択してください：",
       },
     },
-    {
-      type: "actions",
-      elements: choices.map((choice) => ({
-        type: "button",
-        text: {
-          type: "plain_text",
-          text: choice.isSelected ? `> ${choice.text}` : choice.text,
-        },
-        style: choice.isSelected ? "primary" : undefined,
-        action_id: "interactive_choice",
-        value: choice.value,
-      })),
-    },
   ];
 
-  // Enterキーで選択される選択肢がある場合、追加の説明を表示
-  if (selectedChoice) {
+  // 選択肢のボタンを追加
+  if (choices.length > 0) {
+    console.log("Adding buttons for", choices.length, "choices");
+
+    const actionElements = choices.map((choice) => {
+      const button = {
+        type: "button" as const,
+        text: {
+          type: "plain_text" as const,
+          text: choice.isSelected ? `> ${choice.text}` : choice.text,
+        },
+        style: choice.isSelected ? ("primary" as const) : undefined,
+        action_id: "interactive_choice",
+        value: choice.value,
+      };
+      console.log("Creating button:", JSON.stringify(button, null, 2));
+      return button;
+    });
+
     blocks.push({
       type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: {
-            type: "plain_text",
-            text: "⏎ Enter (デフォルト選択を実行)",
-          },
-          style: "primary",
-          action_id: "interactive_choice",
-          value: selectedChoice.value,
-        },
-      ],
+      elements: actionElements,
     });
+
+    // Enterキーで選択される選択肢がある場合、追加の説明を表示
+    if (selectedChoice) {
+      blocks.push({
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "⏎ Enter (デフォルト選択を実行)",
+            },
+            style: "primary",
+            action_id: "interactive_choice",
+            value: selectedChoice.value,
+          },
+        ],
+      });
+    }
+  } else {
+    console.log("No choices to add buttons for");
   }
 
+  console.log("Final blocks structure:", JSON.stringify(blocks, null, 2));
   return blocks;
 };
