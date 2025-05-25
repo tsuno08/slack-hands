@@ -49,40 +49,11 @@ app.event("app_mention", async ({ event, client }) => {
     // ボットのメンション部分を除去してタスクを取得
     const task = SlackUtils.extractMentionText(text);
 
-    // ヘルプコマンドの処理
-    if (!task || task.toLowerCase().includes("help") || task === "?") {
-      logger.info("Help command requested", { channel, user });
-      await client.chat.postMessage({
-        channel: channel,
-        text: `🤖 *Slack Hands Bot* へようこそ！
-
-使用方法:
-\`@${app.client.token ? "bot" : "slack-hands"} [タスクの説明]\`
-
-例:
-• \`@bot ウェブサイトにログイン機能を追加して\`
-• \`@bot バグを修正してください\`
-• \`@bot READMEファイルを更新して\`
-
-機能:
-• 🔄 リアルタイム出力表示
-• ✅ 承認フロー
-• ⏹️ プロセス停止
-• 📁 Git リポジトリ連携
-
-設定:
-• Repository: ${config.repository}
-• Model: ${config.model} (${config.provider})`,
-        thread_ts: ts,
-      });
-      return;
-    }
-
     if (!task) {
       logger.warn("Empty task received", { channel, user, ts });
       await client.chat.postMessage({
         channel: channel,
-        text: "❌ タスクが指定されていません。メンションの後にタスクを記述してください。\n`help` とメンションすると使用方法を表示します。",
+        text: "❌ タスクが指定されていません。メンションの後にタスクを記述してください。",
         thread_ts: ts,
       });
       return;
