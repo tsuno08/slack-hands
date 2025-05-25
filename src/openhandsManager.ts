@@ -58,7 +58,7 @@ export class OpenHandsManager extends EventEmitter {
         "-v",
         "/var/run/docker.sock:/var/run/docker.sock",
         "-v",
-        `${process.env.HOME}/.openhands-state:/.openhands-state`,
+        `${process.cwd()}/.openhands-state:/.openhands-state`,
         "--add-host",
         "host.docker.internal:host-gateway",
         "--name",
@@ -66,7 +66,7 @@ export class OpenHandsManager extends EventEmitter {
         "docker.all-hands.dev/all-hands-ai/openhands:0.39",
         "python",
         "-m",
-        "openhands.core.cli",
+        "openhands.cli.main",
       ];
 
       logger.debug("OpenHands Docker command args:", args);
