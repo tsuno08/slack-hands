@@ -198,7 +198,7 @@ export const detectInteractiveChoices = (
         });
       }
       // ">" で始まらない行で、明らかに選択肢と思われるもの
-      else if (line.match(/^(yes|no|ok|cancel|continue|exit|proceed|abort)/i)) {
+      else if (line.match(/^(yes|no)/i)) {
         console.log("Found unselected choice:", line);
         choices.push({
           text: line,
@@ -267,7 +267,7 @@ export const createInteractiveChoiceBlock = (
           text: choice.isSelected ? `> ${choice.text}` : choice.text,
         },
         style: choice.isSelected ? ("primary" as const) : undefined,
-        action_id: "interactive_choice",
+        action_id: `interactive_choice_${choice.value}`,
         value: choice.value,
       };
       console.log("Creating button:", JSON.stringify(button, null, 2));
@@ -291,7 +291,7 @@ export const createInteractiveChoiceBlock = (
               text: "⏎ Enter (デフォルト選択を実行)",
             },
             style: "primary",
-            action_id: "interactive_choice",
+            action_id: `interactive_choice_${selectedChoice.value}_enter`,
             value: selectedChoice.value,
           },
         ],
